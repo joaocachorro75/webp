@@ -176,20 +176,23 @@ export default function Player({ server, user, pass, onLogout }: PlayerProps) {
     destroyPlayer();
 
     let streamUrl = '';
-    let isHls = false;
+    let tryHlsFirst = false;
 
     if (activeTab === 'live') {
       streamUrl = `${server.url}/live/${user}/${pass}/${streamId}.m3u8`;
-      isHls = true;
+      tryHlsFirst = true;
     } else if (activeTab === 'movie') {
+      // Try m3u8 first (many VOD servers use HLS), fallback to original extension
       const ext = stream.container_extension || 'mp4';
       streamUrl = `${server.url}/movie/${user}/${pass}/${streamId}.${ext}`;
-      isHls = false;
+      tryHlsFirst = ext === 'm3u8';
     } else if (activeTab === 'series' || isEpisode) {
       const ext = stream.container_extension || 'mp4';
       streamUrl = `${server.url}/series/${user}/${pass}/${streamId}.${ext}`;
-      isHls = false;
+      tryHlsFirst = ext === 'm3u8';
     }
+
+    console.log(`[Player] Playing: ${streamUrl}`);
 
     const proxiedUrl = `/api/stream?url=${encodeURIComponent(streamUrl)}`;
 
@@ -199,13 +202,8 @@ export default function Player({ server, user, pass, onLogout }: PlayerProps) {
       const video = videoNode.current;
       video.muted = true;
 
-      // For VOD (Movies/Series), always use VideoJS as it handles more formats
-      if (!isHls) {
-        setupVideoJS(proxiedUrl, 'video/mp4');
-        return;
-      }
-
-      if (Hls.isSupported()) {
+      // Always try HLS first for live, and also for VOD if extension is m3u8
+      if (tryHlsFirst && Hls.isSupported()) {
         const hls = new Hls({
           enableWorker: true,
           lowLatencyMode: true,
@@ -220,22 +218,30 @@ export default function Player({ server, user, pass, onLogout }: PlayerProps) {
         hls.loadSource(proxiedUrl);
         hls.attachMedia(video);
         hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          console.log('[Player] HLS manifest parsed');
           video.play().catch(() => {});
         });
         hls.on(Hls.Events.ERROR, (event, data) => {
           if (data.fatal) {
-            console.error("HLS Fatal Error:", data);
-            // Fallback to .ts for live if m3u8 fails
-            const tsUrl = `${server.url}/live/${user}/${pass}/${streamId}.ts`;
-            const proxiedTs = `/api/stream?url=${encodeURIComponent(tsUrl)}`;
-            setupVideoJS(proxiedTs, 'video/mp2t');
+            console.error("[Player] HLS Fatal Error:", data);
+            // For live, fallback to .ts
+            if (activeTab === 'live') {
+              const tsUrl = `${server.url}/live/${user}/${pass}/${streamId}.ts`;
+              const proxiedTs = `/api/stream?url=${encodeURIComponent(tsUrl)}`;
+              setupVideoJS(proxiedTs, 'video/mp2t');
+            } else {
+              // For VOD, try VideoJS with the original URL
+              setupVideoJS(proxiedUrl, 'video/mp4');
+            }
           }
         });
-      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      } else if (tryHlsFirst && video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari native HLS
         video.src = proxiedUrl;
         video.play().catch(() => {});
       } else {
-        setupVideoJS(proxiedUrl, 'video/mp2t');
+        // Use VideoJS for VOD (handles MP4, MKV, etc.)
+        setupVideoJS(proxiedUrl, 'video/mp4');
       }
     }, 200);
   };

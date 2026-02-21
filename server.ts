@@ -30,7 +30,6 @@ db.exec(`
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
 
   app.use(express.json());
 
@@ -101,11 +100,14 @@ async function startServer() {
     if (!url) return res.status(400).send("URL is required");
 
     const targetUrl = url as string;
-    const isM3U8 = targetUrl.toLowerCase().split('?')[0].endsWith(".m3u8");
+    const urlPath = targetUrl.toLowerCase().split('?')[0];
+    const isM3U8 = urlPath.endsWith(".m3u8");
+
+    console.log(`[Stream] Request: ${targetUrl.substring(0, 100)}...`);
 
     try {
+      // For M3U8 manifests, rewrite URLs to proxy them
       if (isM3U8) {
-        // For manifests, we need to rewrite URLs to proxy them too
         const response = await axios.get(targetUrl, {
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
@@ -140,7 +142,62 @@ async function startServer() {
         return res.send(rewrittenLines.join('\n'));
       }
 
-      // For segments and VOD, use axios with stream response
+      // For VOD and segments - use stream with HEAD request first to detect type
+      const headCheck = await axios({
+        method: 'head',
+        url: targetUrl,
+        httpsAgent,
+        httpAgent,
+        timeout: 10000,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        },
+        validateStatus: () => true
+      }).catch(() => null);
+
+      const contentType = headCheck?.headers?.['content-type'] || '';
+      const detectedM3U8 = contentType.includes('mpegurl') || contentType.includes('m3u8');
+      
+      console.log(`[Stream] Content-Type: ${contentType}, Detected M3U8: ${detectedM3U8}`);
+
+      // If server returns m3u8 content-type, treat as HLS
+      if (detectedM3U8) {
+        console.log(`[Stream] Detected HLS manifest via content-type, rewriting...`);
+        const response = await axios.get(targetUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+          },
+          httpsAgent,
+          httpAgent,
+          timeout: 10000
+        });
+
+        let content = response.data;
+        const baseUrl = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
+
+        const lines = content.split('\n');
+        const rewrittenLines = lines.map((line: string) => {
+          const trimmed = line.trim();
+          if (trimmed && !trimmed.startsWith('#')) {
+            let absoluteUrl = trimmed;
+            if (!trimmed.startsWith('http')) {
+              try {
+                absoluteUrl = new URL(trimmed, baseUrl).href;
+              } catch (e) {
+                return line;
+              }
+            }
+            return `/api/stream?url=${encodeURIComponent(absoluteUrl)}`;
+          }
+          return line;
+        });
+
+        res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        return res.send(rewrittenLines.join('\n'));
+      }
+
+      // Stream the video content
       const response = await axios({
         method: 'get',
         url: targetUrl,
@@ -156,6 +213,8 @@ async function startServer() {
         validateStatus: () => true
       });
 
+      console.log(`[Stream] Response status: ${response.status}, Content-Type: ${response.headers['content-type']}`);
+
       // Forward status
       res.status(response.status);
       
@@ -164,7 +223,8 @@ async function startServer() {
         'content-type',
         'content-length',
         'content-range',
-        'accept-ranges'
+        'accept-ranges',
+        'cache-control'
       ];
 
       essentialHeaders.forEach(h => {
@@ -190,10 +250,13 @@ async function startServer() {
     } catch (error: any) {
       const status = error.response?.status || 500;
       const message = error.message;
-      console.error(`Stream proxy error (${status}):`, message);
+      console.error(`[Stream] Proxy error (${status}):`, message);
       
       if (error.response) {
-        console.error("Target server response headers:", error.response.headers);
+        console.error("[Stream] Target server response:", {
+          status: error.response.status,
+          headers: error.response.headers
+        });
       }
 
       if (!res.headersSent) {
@@ -220,8 +283,9 @@ async function startServer() {
     }
   }
 
+  const PORT = process.env.PORT || 3000;
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://0.0.0.0:${PORT}`);
   });
 }
 
