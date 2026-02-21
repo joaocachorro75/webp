@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Server as ServerIcon, User, Lock, Play, AlertCircle } from 'lucide-react';
+import { Server as ServerIcon, User, Lock, Play, AlertCircle, Loader2 } from 'lucide-react';
 import { Server } from '../types';
 
 interface LoginProps {
@@ -14,44 +14,92 @@ export default function Login({ onLogin }: LoginProps) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [testingServers, setTestingServers] = useState(false);
+  const [testingServerName, setTestingServerName] = useState('');
 
   useEffect(() => {
     fetch('/api/servers')
       .then(res => res.json())
       .then(data => {
         setServers(data);
-        if (data.length > 0) setSelectedServerId(data[0].id.toString());
+        // Don't auto-select - we'll test all servers
       });
   }, []);
+
+  // Test a single server with credentials
+  const testServer = async (server: Server, user: string, pass: string): Promise<boolean> => {
+    try {
+      const params = new URLSearchParams({
+        targetUrl: `${server.url}/player_api.php`,
+        username: user,
+        password: pass
+      });
+      
+      const res = await fetch(`/api/proxy?${params.toString()}`, {
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
+      
+      if (!res.ok) return false;
+      
+      const data = await res.json();
+      return data.user_info && data.user_info.auth === 1;
+    } catch {
+      return false;
+    }
+  };
+
+  // Auto-detect correct server
+  const autoDetectServer = async (user: string, pass: string): Promise<Server | null> => {
+    if (servers.length === 0) return null;
+    
+    setTestingServers(true);
+    setError('');
+    
+    for (const server of servers) {
+      setTestingServerName(server.name);
+      console.log(`[AutoDetect] Testing server: ${server.name}`);
+      
+      const isValid = await testServer(server, user, pass);
+      
+      if (isValid) {
+        console.log(`[AutoDetect] Found valid server: ${server.name}`);
+        setTestingServers(false);
+        setTestingServerName('');
+        return server;
+      }
+    }
+    
+    setTestingServers(false);
+    setTestingServerName('');
+    return null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     
-    const server = servers.find(s => s.id.toString() === selectedServerId);
-    if (!server) {
-      setError('Por favor, selecione um servidor.');
+    if (!username || !password) {
+      setError('Por favor, preencha usuário e senha.');
       return;
     }
 
     setLoading(true);
-    try {
-      const params = new URLSearchParams({
-        targetUrl: `${server.url}/player_api.php`,
-        username,
-        password
-      });
-      
-      const res = await fetch(`/api/proxy?${params.toString()}`);
-      const data = await res.json();
 
-      if (data.user_info && data.user_info.auth === 1) {
-        onLogin(server, username, password);
+    try {
+      // Auto-detect server
+      const validServer = await autoDetectServer(username, password);
+      
+      if (validServer) {
+        onLogin(validServer, username, password);
       } else {
-        setError('Usuário ou senha incorretos.');
+        if (servers.length === 0) {
+          setError('Nenhum servidor configurado. Contate o administrador.');
+        } else {
+          setError('Usuário ou senha incorretos, ou servidor indisponível.');
+        }
       }
     } catch (err) {
-      setError('Erro ao conectar com o servidor.');
+      setError('Erro ao conectar. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -85,26 +133,19 @@ export default function Login({ onLogin }: LoginProps) {
             </motion.div>
           )}
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2 ml-1">Servidor</label>
-              <div className="relative">
-                <ServerIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
-                <select 
-                  id="server-select"
-                  value={selectedServerId}
-                  onChange={(e) => setSelectedServerId(e.target.value)}
-                  className="input-field pl-12 appearance-none cursor-pointer"
-                  required
-                >
-                  <option value="" disabled>Selecione um servidor</option>
-                  {servers.map(s => (
-                    <option key={s.id} value={s.id.toString()}>{s.name}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+          {/* Auto-detect status */}
+          {testingServers && (
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="bg-brand-accent/10 border border-brand-accent/20 text-brand-accent p-3 rounded-xl flex items-center gap-3 text-sm"
+            >
+              <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+              <span>Testando servidor: <strong>{testingServerName}</strong></span>
+            </motion.div>
+          )}
 
+          <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-white/40 uppercase tracking-wider mb-2 ml-1">Usuário</label>
               <div className="relative">
@@ -118,6 +159,7 @@ export default function Login({ onLogin }: LoginProps) {
                   className="input-field pl-12"
                   required
                   autoComplete="username"
+                  disabled={loading || testingServers}
                 />
               </div>
             </div>
@@ -135,6 +177,7 @@ export default function Login({ onLogin }: LoginProps) {
                   className="input-field pl-12"
                   required
                   autoComplete="current-password"
+                  disabled={loading || testingServers}
                 />
               </div>
             </div>
@@ -143,15 +186,25 @@ export default function Login({ onLogin }: LoginProps) {
           <button 
             id="login-submit-button"
             type="submit" 
-            disabled={loading}
+            disabled={loading || testingServers}
             className="btn-primary w-full flex items-center justify-center gap-2"
           >
-            {loading ? (
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            {loading || testingServers ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                {testingServers ? 'Detectando servidor...' : 'Entrando...'}
+              </>
             ) : (
               <>Entrar Agora</>
             )}
           </button>
+
+          {/* Info about auto-detection */}
+          {servers.length > 0 && (
+            <p className="text-center text-white/30 text-xs">
+              O servidor será detectado automaticamente
+            </p>
+          )}
         </form>
 
         <p className="text-center mt-6 text-white/20 text-xs md:text-sm">
