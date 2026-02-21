@@ -69,7 +69,7 @@ export default function Login({ onLogin }: LoginProps) {
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-brand-accent mb-4 shadow-[0_0_30px_rgba(255,78,0,0.3)]">
             <Play className="w-10 h-10 text-white fill-current" />
           </div>
-          <h1 className="text-4xl font-bold tracking-tighter">XTREAM PLAYER</h1>
+          <h1 className="text-4xl font-bold tracking-tighter">WebTV</h1>
           <p className="text-white/40 mt-2">Acesse sua lista de canais e filmes</p>
         </div>
 
@@ -156,6 +156,12 @@ export default function Login({ onLogin }: LoginProps) {
         <p className="text-center mt-8 text-white/20 text-sm">
           Acesso restrito para assinantes autorizados.
         </p>
+
+        <footer className="text-center mt-6 text-white/30 text-xs">
+          <a href="https://to-ligado.com" target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent transition-colors">
+            Desenvolvido por To-Ligado.com
+          </a>
+        </footer>
       </motion.div>
     </div>
   );

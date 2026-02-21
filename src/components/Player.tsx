@@ -285,7 +285,7 @@ export default function Player({ server, user, pass, onLogout }: PlayerProps) {
         className="glass-panel rounded-none border-y-0 border-l-0 flex flex-col z-20"
       >
         <div className="p-6 flex items-center justify-between">
-          {sidebarOpen && <h1 id="app-logo" className="font-bold text-xl tracking-tighter text-brand-accent">XTREAM</h1>}
+          {sidebarOpen && <h1 id="app-logo" className="font-bold text-xl tracking-tighter text-brand-accent">WebTV</h1>}
           <button id="toggle-sidebar" onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-white/5 rounded-lg">
             <Menu className="w-5 h-5" />
           </button>
@@ -321,6 +321,14 @@ export default function Player({ server, user, pass, onLogout }: PlayerProps) {
             {sidebarOpen && <span className="font-medium">Sair</span>}
           </button>
         </div>
+
+        <footer className="p-4 text-center">
+          {sidebarOpen && (
+            <a href="https://to-ligado.com" target="_blank" rel="noopener noreferrer" className="text-xs text-white/30 hover:text-brand-accent transition-colors">
+              Desenvolvido por To-Ligado.com
+            </a>
+          )}
+        </footer>
       </motion.aside>
 
       {/* Main Content */}
