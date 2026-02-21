@@ -1,5 +1,5 @@
 # WebPlayer Xtream API - Dockerfile
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Instalar dependências necessárias para better-sqlite3 e TypeScript
 RUN apk add --no-cache python3 make g++ sqlite sqlite-dev
