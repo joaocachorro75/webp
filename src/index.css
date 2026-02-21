@@ -12,8 +12,19 @@
 }
 
 @layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+  
   body {
     @apply bg-brand-bg text-white font-sans antialiased;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+  
+  * {
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -22,7 +33,7 @@
 }
 
 .input-field {
-  @apply w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-brand-accent/50 transition-colors;
+  @apply w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 focus:outline-none focus:border-brand-accent/50 transition-colors text-base;
 }
 
 .btn-primary {
@@ -33,7 +44,7 @@
   @apply bg-white/10 hover:bg-white/20 text-white font-semibold py-3 px-6 rounded-xl transition-all active:scale-95;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - hide on mobile */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -44,4 +55,49 @@
 
 ::-webkit-scrollbar-thumb {
   @apply bg-white/10 rounded-full hover:bg-white/20;
+}
+
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  
+  * {
+    scrollbar-width: none;
+  }
+}
+
+/* Safe area for notch devices */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Mobile touch feedback */
+.touch-feedback {
+  @apply transition-transform active:scale-95;
+}
+
+/* Full height on mobile */
+.h-screen-mobile {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* Hide scrollbar but keep scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Bottom navigation safe area */
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 1rem));
 }

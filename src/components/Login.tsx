@@ -36,7 +36,6 @@ export default function Login({ onLogin }: LoginProps) {
 
     setLoading(true);
     try {
-      // Test login via proxy
       const params = new URLSearchParams({
         targetUrl: `${server.url}/player_api.php`,
         username,
@@ -59,21 +58,21 @@ export default function Login({ onLogin }: LoginProps) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-[radial-gradient(circle_at_50%_30%,#3a1510_0%,transparent_60%)]">
+    <div className="min-h-screen min-h-[100dvh] flex items-center justify-center p-4 bg-[radial-gradient(circle_at_50%_30%,#3a1510_0%,transparent_60%)]">
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-md"
       >
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-brand-accent mb-4 shadow-[0_0_30px_rgba(255,78,0,0.3)]">
-            <Play className="w-10 h-10 text-white fill-current" />
+        <div className="text-center mb-6 md:mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-3xl bg-brand-accent mb-4 shadow-[0_0_30px_rgba(255,78,0,0.3)]">
+            <Play className="w-8 h-8 md:w-10 md:h-10 text-white fill-current" />
           </div>
-          <h1 className="text-4xl font-bold tracking-tighter">WebTV</h1>
-          <p className="text-white/40 mt-2">Acesse sua lista de canais e filmes</p>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tighter">WebTV</h1>
+          <p className="text-white/40 mt-2 text-sm md:text-base">Acesse sua lista de canais e filmes</p>
         </div>
 
-        <form id="login-form" onSubmit={handleSubmit} className="glass-panel p-8 space-y-6">
+        <form id="login-form" onSubmit={handleSubmit} className="glass-panel p-6 md:p-8 space-y-4 md:space-y-6">
           {error && (
             <motion.div 
               id="login-error-message"
@@ -81,8 +80,8 @@ export default function Login({ onLogin }: LoginProps) {
               animate={{ opacity: 1, y: 0 }}
               className="bg-red-500/10 border border-red-500/20 text-red-500 p-3 rounded-xl flex items-center gap-2 text-sm"
             >
-              <AlertCircle className="w-4 h-4" />
-              {error}
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
             </motion.div>
           )}
 
@@ -118,6 +117,7 @@ export default function Login({ onLogin }: LoginProps) {
                   placeholder="Seu usuário"
                   className="input-field pl-12"
                   required
+                  autoComplete="username"
                 />
               </div>
             </div>
@@ -134,6 +134,7 @@ export default function Login({ onLogin }: LoginProps) {
                   placeholder="Sua senha"
                   className="input-field pl-12"
                   required
+                  autoComplete="current-password"
                 />
               </div>
             </div>
@@ -153,11 +154,11 @@ export default function Login({ onLogin }: LoginProps) {
           </button>
         </form>
 
-        <p className="text-center mt-8 text-white/20 text-sm">
+        <p className="text-center mt-6 text-white/20 text-xs md:text-sm">
           Acesso restrito para assinantes autorizados.
         </p>
 
-        <footer className="text-center mt-6 text-white/30 text-xs">
+        <footer className="text-center mt-4 text-white/30 text-xs">
           <a href="https://to-ligado.com" target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent transition-colors">
             Desenvolvido por To-Ligado.com
           </a>

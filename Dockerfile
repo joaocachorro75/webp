@@ -1,7 +1,7 @@
 # WebPlayer Xtream API - Dockerfile
 FROM node:20-alpine
 
-# Instalar dependências necessárias para better-sqlite3 e TypeScript
+# Instalar dependências necessárias
 RUN apk add --no-cache python3 make g++ sqlite sqlite-dev
 
 WORKDIR /app
@@ -19,8 +19,11 @@ COPY . .
 # Build do frontend
 RUN npm run build
 
-# Criar banco de dados
-RUN touch xtream.db
+# Criar diretório de dados persistente
+RUN mkdir -p /data
+
+# Volume para dados persistentes (servidores e sessões)
+VOLUME /data
 
 # Porta 80 (padrão EasyPanel)
 EXPOSE 80
@@ -29,6 +32,7 @@ EXPOSE 80
 ENV NODE_ENV=production
 ENV PORT=80
 ENV ADMIN_PASSWORD=admin
+ENV DATA_DIR=/data
 
 # Iniciar servidor com tsx
 CMD ["npx", "tsx", "server.ts"]

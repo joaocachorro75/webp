@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Server as ServerIcon, Shield } from 'lucide-react';
+import { Plus, Trash2, Server as ServerIcon, Shield, Users, Clock, Activity } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Server } from '../types';
 
+interface OnlineUser {
+  id: string;
+  user: string;
+  serverName: string;
+  loginTime: number;
+  lastActivity: number;
+  duration: number;
+  ipAddress?: string;
+}
+
 export default function Admin() {
   const [servers, setServers] = useState<Server[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,10 +31,33 @@ export default function Admin() {
     fetchServers();
   }, []);
 
+  // Auto-refresh online users every 10 seconds
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchOnlineUsers();
+      const interval = setInterval(fetchOnlineUsers, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, adminPass]);
+
   const fetchServers = async () => {
     const res = await fetch('/api/servers');
     const data = await res.json();
     setServers(data);
+  };
+
+  const fetchOnlineUsers = async () => {
+    try {
+      const res = await fetch('/api/sessions', {
+        headers: { 'x-admin-password': adminPass }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOnlineUsers(data);
+      }
+    } catch (err) {
+      console.error('Error fetching online users:', err);
+    }
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -80,6 +114,15 @@ export default function Admin() {
     }
   };
 
+  const formatDuration = (seconds: number) => {
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = seconds % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+  };
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
@@ -106,16 +149,71 @@ export default function Admin() {
   }
 
   return (
-    <div className="min-h-screen p-8 max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-8">
-        <Shield className="text-brand-accent w-8 h-8" />
-        <h1 className="text-3xl font-bold">Super Admin</h1>
+    <div className="min-h-screen p-4 md:p-8 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <Shield className="text-brand-accent w-8 h-8" />
+          <h1 className="text-2xl md:text-3xl font-bold">Super Admin</h1>
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <Activity className="w-4 h-4 text-green-500" />
+          <span className="text-white/60">{onlineUsers.length} online</span>
+        </div>
       </div>
 
+      {/* Online Users Section */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="glass-panel p-6 mb-8"
+        className="glass-panel p-4 md:p-6 mb-8"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Users className="w-5 h-5 text-brand-accent" />
+          <h2 className="text-xl font-semibold">Usuários Online</h2>
+          <span className="ml-auto text-sm text-white/40">Atualiza a cada 10s</span>
+        </div>
+        
+        {onlineUsers.length === 0 ? (
+          <p className="text-white/40 italic text-center py-4">Nenhum usuário online no momento.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-white/10 text-left text-white/40">
+                  <th className="pb-3 pr-4">Usuário</th>
+                  <th className="pb-3 pr-4">Servidor</th>
+                  <th className="pb-3 pr-4 hidden md:table-cell">IP</th>
+                  <th className="pb-3 pr-4">Tempo</th>
+                  <th className="pb-3">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {onlineUsers.map((user) => (
+                  <tr key={user.id} className="border-b border-white/5 hover:bg-white/5">
+                    <td className="py-3 pr-4 font-medium">{user.user}</td>
+                    <td className="py-3 pr-4 text-white/60">{user.serverName}</td>
+                    <td className="py-3 pr-4 text-white/40 hidden md:table-cell">{user.ipAddress || '-'}</td>
+                    <td className="py-3 pr-4 text-white/60">{formatDuration(user.duration)}</td>
+                    <td className="py-3">
+                      <span className="inline-flex items-center gap-1 text-green-500">
+                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                        Ativo
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Add Server Form */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="glass-panel p-4 md:p-6 mb-8"
       >
         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
           <Plus className="w-5 h-5" /> Adicionar Novo Servidor
@@ -158,6 +256,7 @@ export default function Admin() {
         </form>
       </motion.div>
 
+      {/* Servers List */}
       <div className="grid gap-4">
         <h2 className="text-xl font-semibold mb-2">Servidores Configurados</h2>
         {servers.length === 0 ? (
@@ -190,6 +289,12 @@ export default function Admin() {
           ))
         )}
       </div>
+
+      <footer className="mt-8 text-center text-white/30 text-sm">
+        <a href="https://to-ligado.com" target="_blank" rel="noopener noreferrer" className="hover:text-brand-accent transition-colors">
+          Desenvolvido por To-Ligado.com
+        </a>
+      </footer>
     </div>
   );
 }
