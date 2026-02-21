@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Tv, Film, Clapperboard, LogOut, Search, 
-  ChevronRight, Play, Info, X, Menu, AlertTriangle, ChevronLeft
+  ChevronRight, Play, Info, X, Menu, AlertTriangle, ChevronLeft, Download
 } from 'lucide-react';
 import Hls from 'hls.js';
 import videojs from 'video.js';
@@ -33,10 +33,46 @@ export default function Player({ server, user, pass, onLogout }: PlayerProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
   
   const videoNode = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<any>(null);
   const hlsRef = useRef<Hls | null>(null);
+
+  // PWA Install prompt
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return;
+    
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      setIsInstallable(false);
+    }
+    setDeferredPrompt(null);
+  };
+
+  const handleLogoutClick = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = () => {
+    setShowLogoutConfirm(false);
+    onLogout();
+  };
 
   useEffect(() => {
     fetchCategories();
@@ -320,10 +356,19 @@ export default function Player({ server, user, pass, onLogout }: PlayerProps) {
             ))}
           </nav>
 
-          <div className="p-4 border-t border-white/10">
+          <div className="p-4 border-t border-white/10 space-y-2">
+            {isInstallable && (
+              <button 
+                onClick={handleInstallApp}
+                className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-green-500/10 text-green-500 transition-all"
+              >
+                <Download className="w-6 h-6 shrink-0" />
+                <span className="font-medium">Instalar App</span>
+              </button>
+            )}
             <button 
               id="logout-button"
-              onClick={onLogout}
+              onClick={handleLogoutClick}
               className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-red-500/10 text-red-500 transition-all"
             >
               <LogOut className="w-6 h-6 shrink-0" />
@@ -529,8 +574,17 @@ export default function Player({ server, user, pass, onLogout }: PlayerProps) {
                     <p className="text-xs text-white/40">{server.name}</p>
                   </div>
                 </div>
+                {isInstallable && (
+                  <button 
+                    onClick={handleInstallApp}
+                    className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-green-500/10 text-green-500 transition-all mb-2"
+                  >
+                    <Download className="w-6 h-6 shrink-0" />
+                    <span className="font-medium">Instalar App</span>
+                  </button>
+                )}
                 <button 
-                  onClick={onLogout}
+                  onClick={handleLogoutClick}
                   className="w-full flex items-center gap-4 p-3 rounded-xl hover:bg-red-500/10 text-red-500 transition-all"
                 >
                   <LogOut className="w-6 h-6 shrink-0" />
@@ -758,6 +812,44 @@ export default function Player({ server, user, pass, onLogout }: PlayerProps) {
           </button>
         ))}
       </nav>
+
+      {/* Logout Confirmation Modal */}
+      <AnimatePresence>
+        {showLogoutConfirm && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setShowLogoutConfirm(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="glass-panel p-6 max-w-sm w-full"
+              onClick={e => e.stopPropagation()}
+            >
+              <h3 className="text-xl font-bold mb-2">Sair do App?</h3>
+              <p className="text-white/60 mb-6">Tem certeza que deseja sair? Você precisará fazer login novamente.</p>
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => setShowLogoutConfirm(false)}
+                  className="flex-1 py-3 px-4 rounded-xl bg-white/10 hover:bg-white/20 transition-colors font-medium"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={confirmLogout}
+                  className="flex-1 py-3 px-4 rounded-xl bg-red-500 hover:bg-red-600 transition-colors font-medium"
+                >
+                  Sair
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
