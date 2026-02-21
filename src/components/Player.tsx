@@ -9,6 +9,7 @@ import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
 import 'mux.js';
 import { Server, Category, Stream, SeriesInfo, Episode } from '../types';
+import { useAppConfig } from '../hooks/useAppConfig';
 
 interface PlayerProps {
   server: Server;
@@ -18,6 +19,7 @@ interface PlayerProps {
 }
 
 export default function Player({ server, user, pass, onLogout }: PlayerProps) {
+  const config = useAppConfig();
   const [activeTab, setActiveTab] = useState<'live' | 'movie' | 'series'>('live');
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -277,7 +279,10 @@ export default function Player({ server, user, pass, onLogout }: PlayerProps) {
         <button onClick={() => setSidebarOpen(true)} className="p-2 hover:bg-white/5 rounded-lg">
           <Menu className="w-6 h-6" />
         </button>
-        <h1 className="font-bold text-lg tracking-tighter text-brand-accent">WebTV</h1>
+        <h1 className="font-bold text-lg tracking-tighter text-brand-accent flex items-center gap-2">
+          {config.logoUrl && <img src={config.logoUrl} alt="" className="h-6 w-auto" />}
+          {config.appName}
+        </h1>
         <div className="w-10" />
       </header>
 
@@ -289,7 +294,10 @@ export default function Player({ server, user, pass, onLogout }: PlayerProps) {
           className="hidden md:flex w-64 glass-panel rounded-none border-y-0 border-l-0 flex-col"
         >
           <div className="p-6 flex items-center justify-between">
-            <h1 id="app-logo" className="font-bold text-xl tracking-tighter text-brand-accent">WebTV</h1>
+            <h1 id="app-logo" className="font-bold text-xl tracking-tighter text-brand-accent flex items-center gap-2">
+              {config.logoUrl && <img src={config.logoUrl} alt="" className="h-7 w-auto" />}
+              {config.appName}
+            </h1>
           </div>
 
           <nav id="sidebar-nav" className="flex-1 px-4 space-y-2">
@@ -480,7 +488,10 @@ export default function Player({ server, user, pass, onLogout }: PlayerProps) {
               onClick={e => e.stopPropagation()}
             >
               <div className="p-6 flex items-center justify-between border-b border-white/10">
-                <h1 className="font-bold text-xl tracking-tighter text-brand-accent">WebTV</h1>
+                <h1 className="font-bold text-xl tracking-tighter text-brand-accent flex items-center gap-2">
+                  {config.logoUrl && <img src={config.logoUrl} alt="" className="h-7 w-auto" />}
+                  {config.appName}
+                </h1>
                 <button onClick={() => setSidebarOpen(false)} className="p-2 hover:bg-white/5 rounded-lg">
                   <X className="w-5 h-5" />
                 </button>

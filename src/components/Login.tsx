@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Server as ServerIcon, User, Lock, Play, AlertCircle, Loader2 } from 'lucide-react';
 import { Server } from '../types';
+import { useAppConfig } from '../hooks/useAppConfig';
 
 interface LoginProps {
   onLogin: (server: Server, user: string, pass: string) => void;
 }
 
 export default function Login({ onLogin }: LoginProps) {
+  const config = useAppConfig();
   const [servers, setServers] = useState<Server[]>([]);
   const [selectedServerId, setSelectedServerId] = useState<string>('');
   const [username, setUsername] = useState('');
@@ -114,9 +116,13 @@ export default function Login({ onLogin }: LoginProps) {
       >
         <div className="text-center mb-6 md:mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 md:w-20 md:h-20 rounded-3xl bg-brand-accent mb-4 shadow-[0_0_30px_rgba(255,78,0,0.3)]">
-            <Play className="w-8 h-8 md:w-10 md:h-10 text-white fill-current" />
+            {config.logoUrl ? (
+              <img src={config.logoUrl} alt={config.appName} className="w-10 h-10 md:w-12 md:h-12 object-contain" />
+            ) : (
+              <Play className="w-8 h-8 md:w-10 md:h-10 text-white fill-current" />
+            )}
           </div>
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tighter">WebTV</h1>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tighter">{config.appName}</h1>
           <p className="text-white/40 mt-2 text-sm md:text-base">Acesse sua lista de canais e filmes</p>
         </div>
 

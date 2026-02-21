@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Server as ServerIcon, Shield, Users, Clock, Activity } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Server as ServerIcon, Shield, Users, Upload, Image, Settings, Save } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Server } from '../types';
 
@@ -13,6 +13,12 @@ interface OnlineUser {
   ipAddress?: string;
 }
 
+interface AppConfig {
+  appName: string;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+}
+
 export default function Admin() {
   const [servers, setServers] = useState<Server[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
@@ -21,6 +27,17 @@ export default function Admin() {
   const [loading, setLoading] = useState(false);
   const [adminPass, setAdminPass] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // App config state
+  const [config, setConfig] = useState<AppConfig>({
+    appName: 'WebTV',
+    logoUrl: null,
+    faviconUrl: null
+  });
+  const [configLoading, setConfigLoading] = useState(false);
+  
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const faviconInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const savedPass = localStorage.getItem('admin_password');
@@ -29,6 +46,7 @@ export default function Admin() {
       setIsAuthenticated(true);
     }
     fetchServers();
+    fetchConfig();
   }, []);
 
   // Auto-refresh online users every 10 seconds
@@ -44,6 +62,16 @@ export default function Admin() {
     const res = await fetch('/api/servers');
     const data = await res.json();
     setServers(data);
+  };
+
+  const fetchConfig = async () => {
+    try {
+      const res = await fetch('/api/config');
+      const data = await res.json();
+      setConfig(data);
+    } catch (err) {
+      console.error('Error fetching config:', err);
+    }
   };
 
   const fetchOnlineUsers = async () => {
@@ -114,6 +142,94 @@ export default function Admin() {
     }
   };
 
+  // Save app name
+  const handleSaveAppName = async () => {
+    setConfigLoading(true);
+    try {
+      const res = await fetch('/api/config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-password': adminPass
+        },
+        body: JSON.stringify({ appName: config.appName })
+      });
+      if (res.ok) {
+        alert('Nome do app salvo com sucesso!');
+        fetchConfig();
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao salvar nome do app.');
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
+  // Upload logo
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('logo', file);
+
+    setConfigLoading(true);
+    try {
+      const res = await fetch('/api/config/logo', {
+        method: 'POST',
+        headers: { 'x-admin-password': adminPass },
+        body: formData
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setConfig(prev => ({ ...prev, logoUrl: data.logoUrl }));
+        alert('Logo enviada com sucesso!');
+      } else {
+        alert('Erro ao enviar logo.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao enviar logo.');
+    } finally {
+      setConfigLoading(false);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+    }
+  };
+
+  // Upload favicon
+  const handleFaviconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('favicon', file);
+
+    setConfigLoading(true);
+    try {
+      const res = await fetch('/api/config/favicon', {
+        method: 'POST',
+        headers: { 'x-admin-password': adminPass },
+        body: formData
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        setConfig(prev => ({ ...prev, faviconUrl: data.faviconUrl }));
+        alert('Favicon enviado com sucesso!');
+      } else {
+        alert('Erro ao enviar favicon.');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Erro ao enviar favicon.');
+    } finally {
+      setConfigLoading(false);
+      if (faviconInputRef.current) faviconInputRef.current.value = '';
+    }
+  };
+
   const formatDuration = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
@@ -156,15 +272,119 @@ export default function Admin() {
           <h1 className="text-2xl md:text-3xl font-bold">Super Admin</h1>
         </div>
         <div className="flex items-center gap-2 text-sm">
-          <Activity className="w-4 h-4 text-green-500" />
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
           <span className="text-white/60">{onlineUsers.length} online</span>
         </div>
       </div>
+
+      {/* App Configuration Section */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-panel p-4 md:p-6 mb-8"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <Settings className="w-5 h-5 text-brand-accent" />
+          <h2 className="text-xl font-semibold">Configurações do App</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* App Name */}
+          <div>
+            <label className="block text-sm text-white/60 mb-2">Nome do App</label>
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                value={config.appName}
+                onChange={(e) => setConfig(prev => ({ ...prev, appName: e.target.value }))}
+                placeholder="WebTV"
+                className="input-field flex-1"
+              />
+              <button 
+                onClick={handleSaveAppName}
+                disabled={configLoading}
+                className="btn-primary px-4"
+              >
+                <Save className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Logo Upload */}
+          <div>
+            <label className="block text-sm text-white/60 mb-2">Logo</label>
+            <div className="flex items-center gap-3">
+              {config.logoUrl ? (
+                <img 
+                  src={config.logoUrl} 
+                  alt="Logo" 
+                  className="w-12 h-12 object-contain rounded-lg bg-white/5 p-1"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center">
+                  <Image className="w-6 h-6 text-white/20" />
+                </div>
+              )}
+              <input 
+                ref={logoInputRef}
+                type="file" 
+                accept="image/*"
+                onChange={handleLogoUpload}
+                className="hidden"
+                id="logo-upload"
+              />
+              <button 
+                onClick={() => logoInputRef.current?.click()}
+                disabled={configLoading}
+                className="btn-secondary flex items-center gap-2 text-sm"
+              >
+                <Upload className="w-4 h-4" />
+                {config.logoUrl ? 'Trocar' : 'Enviar'}
+              </button>
+            </div>
+          </div>
+
+          {/* Favicon Upload */}
+          <div>
+            <label className="block text-sm text-white/60 mb-2">Favicon</label>
+            <div className="flex items-center gap-3">
+              {config.faviconUrl ? (
+                <img 
+                  src={config.faviconUrl} 
+                  alt="Favicon" 
+                  className="w-12 h-12 object-contain rounded-lg bg-white/5 p-1"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center">
+                  <Image className="w-6 h-6 text-white/20" />
+                </div>
+              )}
+              <input 
+                ref={faviconInputRef}
+                type="file" 
+                accept="image/*,.ico"
+                onChange={handleFaviconUpload}
+                className="hidden"
+                id="favicon-upload"
+              />
+              <button 
+                onClick={() => faviconInputRef.current?.click()}
+                disabled={configLoading}
+                className="btn-secondary flex items-center gap-2 text-sm"
+              >
+                <Upload className="w-4 h-4" />
+                {config.faviconUrl ? 'Trocar' : 'Enviar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Online Users Section */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
         className="glass-panel p-4 md:p-6 mb-8"
       >
         <div className="flex items-center gap-2 mb-4">
@@ -212,7 +432,7 @@ export default function Admin() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
+        transition={{ delay: 0.2 }}
         className="glass-panel p-4 md:p-6 mb-8"
       >
         <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">

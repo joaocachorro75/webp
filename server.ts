@@ -7,6 +7,7 @@ import fs from "fs";
 import axios from "axios";
 import https from "https";
 import http from "http";
+import multer from "multer";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -26,20 +27,52 @@ const httpAgent = new http.Agent({
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
 const SERVERS_FILE = path.join(DATA_DIR, "servers.json");
 const SESSIONS_FILE = path.join(DATA_DIR, "sessions.json");
+const CONFIG_FILE = path.join(DATA_DIR, "config.json");
+const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
 
-// Ensure data directory exists
+// Ensure directories exist
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
 
-// Server type
+// ============ MULTER CONFIG FOR UPLOADS ============
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const prefix = file.fieldname === 'logo' ? 'logo' : 'favicon';
+    cb(null, `${prefix}${ext}`);
+  }
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|ico|svg|webp/;
+    const ext = path.extname(file.originalname).toLowerCase();
+    const mime = file.mimetype;
+    
+    if (allowedTypes.test(ext) || mime.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Apenas imagens são permitidas'));
+    }
+  }
+});
+
+// ============ TYPES ============
 interface Server {
   id: number;
   name: string;
   url: string;
 }
 
-// Session type
 interface Session {
   id: string;
   user: string;
@@ -50,6 +83,13 @@ interface Session {
   ipAddress?: string;
 }
 
+interface AppConfig {
+  appName: string;
+  logoUrl: string | null;
+  faviconUrl: string | null;
+}
+
+// ============ DATA HELPERS ============
 // Load servers from JSON file
 function loadServers(): Server[] {
   try {
@@ -97,9 +137,42 @@ function saveSessions(sessions: Map<string, Session>) {
   }
 }
 
-// Initialize data
+// Load app config from JSON file
+function loadConfig(): AppConfig {
+  try {
+    if (fs.existsSync(CONFIG_FILE)) {
+      const data = fs.readFileSync(CONFIG_FILE, "utf-8");
+      return JSON.parse(data);
+    }
+  } catch (err) {
+    console.error("[Storage] Error loading config:", err);
+  }
+  return {
+    appName: "WebTV",
+    logoUrl: null,
+    faviconUrl: null
+  };
+}
+
+// Save app config to JSON file
+function saveConfig(config: AppConfig) {
+  try {
+    fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2));
+    console.log(`[Storage] Saved config: ${config.appName}`);
+  } catch (err) {
+    console.error("[Storage] Error saving config:", err);
+  }
+}
+
+// Get current uploads
+function getUploadUrl(filename: string): string {
+  return `/uploads/${filename}`;
+}
+
+// ============ INITIALIZE DATA ============
 let servers = loadServers();
 const sessions = loadSessions();
+let appConfig = loadConfig();
 let nextServerId = servers.length > 0 ? Math.max(...servers.map(s => s.id)) + 1 : 1;
 
 // Cleanup inactive sessions every 5 minutes
@@ -124,6 +197,9 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Serve uploads directory statically
+  app.use("/uploads", express.static(UPLOADS_DIR));
+
   // Middleware to check admin password
   const adminAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const password = req.headers["x-admin-password"];
@@ -134,6 +210,63 @@ async function startServer() {
     }
     next();
   };
+
+  // ============ APP CONFIG ROUTES ============
+  
+  // Get app config (public - for frontend)
+  app.get("/api/config", (req, res) => {
+    res.json({
+      appName: appConfig.appName,
+      logoUrl: appConfig.logoUrl,
+      faviconUrl: appConfig.faviconUrl
+    });
+  });
+
+  // Update app config (admin only)
+  app.post("/api/config", adminAuth, (req, res) => {
+    const { appName } = req.body;
+    
+    if (appName) {
+      appConfig.appName = appName;
+      saveConfig(appConfig);
+    }
+    
+    res.json(appConfig);
+  });
+
+  // Upload logo (admin only)
+  app.post("/api/config/logo", adminAuth, upload.single('logo'), (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Nenhum arquivo enviado" });
+    }
+    
+    const filename = req.file.filename;
+    appConfig.logoUrl = getUploadUrl(filename);
+    saveConfig(appConfig);
+    
+    console.log(`[Config] Logo uploaded: ${filename}`);
+    res.json({ 
+      success: true, 
+      logoUrl: appConfig.logoUrl 
+    });
+  });
+
+  // Upload favicon (admin only)
+  app.post("/api/config/favicon", adminAuth, upload.single('favicon'), (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "Nenhum arquivo enviado" });
+    }
+    
+    const filename = req.file.filename;
+    appConfig.faviconUrl = getUploadUrl(filename);
+    saveConfig(appConfig);
+    
+    console.log(`[Config] Favicon uploaded: ${filename}`);
+    res.json({ 
+      success: true, 
+      faviconUrl: appConfig.faviconUrl 
+    });
+  });
 
   // ============ SERVER ROUTES ============
   
@@ -468,6 +601,7 @@ async function startServer() {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
     console.log(`Data directory: ${DATA_DIR}`);
     console.log(`Servers loaded: ${servers.length}`);
+    console.log(`App name: ${appConfig.appName}`);
   });
 }
 
