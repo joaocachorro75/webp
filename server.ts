@@ -2,10 +2,15 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 import fs from "fs";
 import axios from "axios";
 import https from "https";
 import http from "http";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const db = new Database("xtream.db");
 
