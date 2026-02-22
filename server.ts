@@ -200,6 +200,45 @@ async function startServer() {
   // Serve uploads directory statically
   app.use("/uploads", express.static(UPLOADS_DIR));
 
+  // Serve public directory statically
+  const publicPath = path.join(__dirname, "public");
+  if (fs.existsSync(publicPath)) {
+    app.use(express.static(publicPath));
+  }
+
+  // Dynamic manifest.json with custom logo
+  app.get("/manifest.json", (req, res) => {
+    const iconUrl = appConfig.logoUrl || "/icon.svg";
+    res.setHeader("Content-Type", "application/manifest+json");
+    res.json({
+      name: appConfig.appName || "WebTV",
+      short_name: appConfig.appName || "WebTV",
+      description: "Assista canais, filmes e séries",
+      start_url: "/",
+      display: "standalone",
+      background_color: "#0a0502",
+      theme_color: "#ff4e00",
+      orientation: "any",
+      icons: [
+        {
+          src: iconUrl,
+          sizes: "192x192",
+          type: "image/png",
+          purpose: "any maskable"
+        },
+        {
+          src: iconUrl,
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "any maskable"
+        }
+      ],
+      categories: ["entertainment", "video"],
+      lang: "pt-BR",
+      prefer_related_applications: false
+    });
+  });
+
   // Middleware to check admin password
   const adminAuth = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     const password = req.headers["x-admin-password"];
