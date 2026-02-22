@@ -208,6 +208,7 @@ async function startServer() {
 
   // Dynamic manifest.json with custom logo
   app.get("/manifest.json", (req, res) => {
+    // Use custom logo if uploaded, otherwise use default SVG
     const iconUrl = appConfig.logoUrl || "/icon.svg";
     res.setHeader("Content-Type", "application/manifest+json");
     res.json({
@@ -223,14 +224,14 @@ async function startServer() {
         {
           src: iconUrl,
           sizes: "192x192",
-          type: "image/png",
-          purpose: "any maskable"
+          type: iconUrl.endsWith(".svg") ? "image/svg+xml" : "image/png",
+          purpose: "any"
         },
         {
           src: iconUrl,
           sizes: "512x512",
-          type: "image/png",
-          purpose: "any maskable"
+          type: iconUrl.endsWith(".svg") ? "image/svg+xml" : "image/png",
+          purpose: "any"
         }
       ],
       categories: ["entertainment", "video"],
